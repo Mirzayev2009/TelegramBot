@@ -1,0 +1,17 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot for Umida Pardalar masterclass",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "Mirzayev Alisher",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.0.0",
+    "node-telegram-bot-api": "^0.63.0"
+  }
+}
+
