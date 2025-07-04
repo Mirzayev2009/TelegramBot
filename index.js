@@ -1,12 +1,9 @@
 const TelegramBot = require('node-telegram-bot-api');
+const fs = require('fs');
 const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ';
 const channelUsername = '@umida_pardalar1';
 
-
-
 const bot = new TelegramBot(token, { polling: true });
-
-
 
 let botUsername = 'bot';
 bot.getMe().then(me => {
@@ -14,7 +11,16 @@ bot.getMe().then(me => {
   console.log(`🤖 Bot launched as @${botUsername}`);
 });
 
-const users = {}
+const users = {};
+
+// Load masterclass video ID from file (if exists)
+let masterclassVideoId = '';
+if (fs.existsSync('video_id.txt')) {
+  masterclassVideoId = fs.readFileSync('video_id.txt', 'utf8');
+  console.log("🎬 Video file_id loaded from file:", masterclassVideoId);
+} else {
+  console.log("⚠️ No video_id.txt file found. Please upload a video using /upload");
+}
 
 function logUsers() {
   console.log("\n📊 [LIVE USER LIST]");
@@ -84,13 +90,13 @@ bot.on('callback_query', async (query) => {
       if (isMember) {
         await bot.sendMessage(chatId, "✅ Siz kanalga muvaffaqiyatli a’zo bo‘ldingiz!");
 
-        try {
+        if (masterclassVideoId) {
           await bot.sendVideo(chatId, masterclassVideoId, {
-            caption: "🎬 Bu madam modelini darsligi! , 18-iyul kuni bo'ladigan vebinar haqidagi ma'lumotlarni kanalimiz orqali bilib boring!"
+            caption: "🎬 Bu madam modelini darsligi! 18-iyul kuni bo'ladigan vebinar haqidagi ma'lumotlarni kanalimiz orqali bilib boring!",
+            supports_streaming: true
           });
-        } catch (videoErr) {
-          console.error("Video yuborishda xatolik:", videoErr.message);
-          await bot.sendMessage(chatId, "⚠️ Video yuborishda muammo yuz berdi.");
+        } else {
+          await bot.sendMessage(chatId, "⚠️ Hozircha hech qanday video yo‘q. Iltimos, /upload orqali video yuboring.");
         }
 
         return;
@@ -135,17 +141,24 @@ Bu kanalda siz:
   });
 });
 
-// Watch for new videos and update file_id
+// Upload new video
 bot.on('message', (msg) => {
   if (msg.video) {
     const fileId = msg.video.file_id;
     console.log("📁 Yangi video file_id:", fileId);
+
     masterclassVideoId = fileId;
+    fs.writeFileSync('video_id.txt', fileId);
     bot.sendMessage(msg.chat.id, "✅ Video qabul qilindi. Endi shu video yuboriladi.");
   }
 });
 
-// Hidden admin command
+// /upload helper
+bot.onText(/\/upload/, (msg) => {
+  bot.sendMessage(msg.chat.id, "📤 Iltimos, yangi video faylni shu yerga yuboring.");
+});
+
+// /admin
 bot.onText(/\/admin/, (msg) => {
   const chatId = msg.chat.id;
   const entries = Object.entries(users);
@@ -156,7 +169,3 @@ bot.onText(/\/admin/, (msg) => {
   bot.sendMessage(chatId, `👥 Foydalanuvchilar soni: ${entries.length}\n\n${list}`);
 });
 
-// Upload video command helper
-bot.onText(/\/upload/, (msg) => {
-  bot.sendMessage(msg.chat.id, "📤 Iltimos, yangi video faylni shu yerga yuboring.");
-});
