@@ -83,7 +83,7 @@ bot.on('callback_query', async (query) => {
 
         try {
           await bot.sendVideo(chatId, masterclassVideoId, {
-            caption: "🎬 Bu masterklass haqida qisqacha video. Tomosha qiling!"
+            caption: "🎬 Bu madam modelini darsligi! , 18-iyul kuni bo'ladigan vebinar haqidagi ma'lumotlarni kanalimiz orqali bilib boring!"
           });
         } catch (videoErr) {
           console.error("Video yuborishda xatolik:", videoErr.message);
