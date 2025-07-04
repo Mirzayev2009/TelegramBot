@@ -14,8 +14,7 @@ bot.getMe().then(me => {
   console.log(`🤖 Bot launched as @${botUsername}`);
 });
 
-const users = {};
-let masterclassVideoId = 'BAACAgIAAxkBAAMzaGKDQvRfQIEyDdDxBRavmOzVTywAAjd2AAIGvBBLjth6h9U1_Aw2BA'; // Default
+const users = {}
 
 function logUsers() {
   console.log("\n📊 [LIVE USER LIST]");
