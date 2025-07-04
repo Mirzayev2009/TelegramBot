@@ -2,7 +2,11 @@ const TelegramBot = require('node-telegram-bot-api');
 const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ';
 const channelUsername = '@umida_pardalar1';
 
+
+
 const bot = new TelegramBot(token, { polling: true });
+
+
 
 let botUsername = 'bot';
 bot.getMe().then(me => {
