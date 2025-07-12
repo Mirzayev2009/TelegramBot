@@ -1,5 +1,5 @@
 const TelegramBot = require('node-telegram-bot-api');
-const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ';
+const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ'; // replace with your new token
 const channelUsername = '@umida_pardalar1';
 
 const bot = new TelegramBot(token, { polling: true });
@@ -8,30 +8,28 @@ bot.getMe().then(me => {
   console.log(`🤖 Bot launched as @${me.username}`);
 });
 
-// /start → Ask to join channel and show "Check"
+// Start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
 
-  const text = `
+  const message = `
 🤝 *Assalomu alaykum!*
 
-Kanalga qo‘shilish orqali masterklassda ishtirok eting:
-
-📢 @umida_pardalar1
+Masterklassda ishtirok etish uchun avval kanalga qo‘shiling 👇
   `;
 
-  bot.sendMessage(chatId, text, {
+  bot.sendMessage(chatId, message, {
     parse_mode: 'Markdown',
     reply_markup: {
       inline_keyboard: [
-        [{ text: "🔗 Kanalga qo‘shilish", url: `https://t.me/${channelUsername.replace('@', '')}` }],
-        [{ text: "✅ Tekshirish", callback_data: "check_join" }]
+        [{ text: '🔗 Kanalga qo‘shilish', url: `https://t.me/${channelUsername.replace('@', '')}` }],
+        [{ text: '✅ Tekshirish', callback_data: 'check_join' }]
       ]
     }
   });
 });
 
-// Tekshiradi: user kanalga qo‘shilganmi
+// Subscription check
 bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const userId = query.from.id;
@@ -47,8 +45,7 @@ bot.on('callback_query', async (query) => {
         await bot.sendMessage(chatId, "❗ Siz hali kanalga a’zo emassiz. Iltimos, avval kanalga qo‘shiling.");
       }
     } catch (err) {
-      console.error(err);
-      await bot.sendMessage(chatId, "⚠️ Tekshiruvda xatolik yuz berdi.");
+      await bot.sendMessage(chatId, "⚠️ Tekshirishda xatolik yuz berdi. Keyinroq urinib ko‘ring.");
     }
   }
 });
