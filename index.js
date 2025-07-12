@@ -15,7 +15,7 @@ bot.onText(/\/start/, (msg) => {
   const message = `
 🤝 *Assalomu alaykum!*
 
-Masterklassda ishtirok etish uchun avval kanalga qo‘shiling 👇
+Endi faqat oxirgi bosqichgina qoldi, masterklass mana shu Telegram kanalmizda bo'lib o'tadi! 👇
   `;
 
   bot.sendMessage(chatId, message, {
