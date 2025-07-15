@@ -90,7 +90,8 @@ bot.on('message', async (msg) => {
     if (error) {
       await bot.sendMessage(chatId, "❌ Xatolik. Raqamni to‘g‘ri kiriting.");
     } else {
-      await bot.sendMessage(chatId, "✅ Ro‘yxatdan o‘tdingiz!");
+      await bot.sendMessage(chatId, "✅ Ro‘yxatdan muvaffaqiyatli o‘tdingiz!\n\n📌 Masterklass kuni sizga eslatma xabari yuboriladi.\nSabr bilan kuting. Omad!");
+
     }
 
     delete tempUsers[chatId];
