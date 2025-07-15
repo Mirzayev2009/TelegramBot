@@ -116,7 +116,7 @@ bot.onText(/\/pick_winners/, async (msg) => {
   bot.sendMessage(msg.chat.id, `🏆 G‘oliblar:\n${winners.map(w => '👤 ' + w.name).join('\n')}`);
 });
 
-const { createClient } = require('@supabase/supabase-js');
+
 
 
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
