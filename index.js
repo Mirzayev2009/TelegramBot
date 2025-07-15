@@ -5,7 +5,7 @@ const { createClient } = require('@supabase/supabase-js');
 const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ';
 const supabaseUrl = 'https://scinkyuoosbtpdowdzhd.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjaW5reXVvb3NidHBkb3dkemhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyNTQ4NTQsImV4cCI6MjA2NzgzMDg1NH0.eiku1mD-_bZXUoIJHmhJ6IfemmBPxcnjms1buENCcyw';
-const channelUsername = '@umida_pardalar1';
+const channelUsername = '@umida_pardalarN1';
 const ADMIN_ID = 5032534773; // Replace with your Telegram user ID
 
 // Init
