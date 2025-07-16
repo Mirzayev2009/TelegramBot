@@ -9,10 +9,12 @@ const ADMIN_ID = 5032534773;
 
 
 
+
+// Init bot and Supabase
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// /start — Save telegram_id if not already saved
+// /start — Register telegram_id
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
@@ -34,7 +36,7 @@ bot.onText(/\/start/, async (msg) => {
     }
 
     const { error: insertError } = await supabase
-      .from('telegram_users')
+      .from('bot_user_data')
       .insert({ telegram_id });
 
     if (insertError) {
@@ -50,13 +52,15 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// Admin: /broadcast
+// /broadcast — Admin can send message to all
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const text = match[1];
 
-  const { data: users, error } = await supabase.from('telegram_users').select('telegram_id');
+  const { data: users, error } = await supabase
+    .from('bot_user_data')
+    .select('telegram_id');
 
   if (error) {
     console.error('❌ Supabase SELECT error (broadcast):', error);
@@ -74,19 +78,22 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// Admin: /pick_winners
+// /pick_winners — Randomly select 3 winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
-  const { data: users, error } = await supabase.from('telegram_users').select('*');
+  const { data: users, error } = await supabase
+    .from('bot_user_data')
+    .select('telegram_id');
 
   if (error) {
     console.error('❌ Supabase SELECT error (winners):', error);
     return bot.sendMessage(msg.chat.id, `❌ Xatolik:\n${error.message}`);
   }
 
-  if (!users || users.length < 3)
+  if (!users || users.length < 3) {
     return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
+  }
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
 
