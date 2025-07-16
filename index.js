@@ -7,19 +7,20 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const ADMIN_ID = 5032534773;
 
-
-
-
-// Init bot and Supabase
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// /start — Register telegram_id
+// In-memory cache of started users (telegram_id strings)
+const startedUsers = new Set();
+
+// Helper: Check and update cache at startup if you want (optional)
+
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
   try {
+    // Check if user exists in DB
     const { data: existing, error: checkError } = await supabase
       .from('bot_user_data')
       .select('id')
@@ -32,9 +33,11 @@ bot.onText(/\/start/, async (msg) => {
     }
 
     if (existing) {
+      startedUsers.add(telegram_id);
       return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
     }
 
+    // Insert new user
     const { error: insertError } = await supabase
       .from('bot_user_data')
       .insert({ telegram_id });
@@ -44,6 +47,7 @@ bot.onText(/\/start/, async (msg) => {
       return bot.sendMessage(chatId, `❌ Yozishda xatolik:\n${insertError.message}`);
     }
 
+    startedUsers.add(telegram_id);
     return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
 
   } catch (err) {
@@ -52,7 +56,7 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// /broadcast — Admin can send message to all
+// /broadcast - Admin sends to all
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -78,7 +82,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// /pick_winners — Randomly select 3 winners
+// /pick_winners - Admin picks 3 winners randomly
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -109,18 +113,22 @@ bot.onText(/\/pick_winners/, async (msg) => {
   bot.sendMessage(msg.chat.id, `🏆 G‘oliblar:\n${winners.map(w => '👤 ' + w.telegram_id).join('\n')}`);
 });
 
-
 // Catch-all message handler for any text that is NOT /start
-bot.on('message', (msg) => {
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
+  const telegram_id = String(msg.from.id);
   const text = msg.text;
 
   if (!text) return; // ignore non-text messages
+  if (text.startsWith('/start')) return; // already handled
 
-  // If user already sent /start, ignore here (or you can handle it separately)
-  if (text.startsWith('/start')) return;
+  // If user already started (registered), just ignore or handle normally here:
+  if (startedUsers.has(telegram_id)) {
+    // User already started, do nothing special or add other handlers here
+    return;
+  }
 
-  // Reply with a message and inline "Start" button
+  // If user not started yet, send inline start button
   bot.sendMessage(chatId, "Salom! Boshlash uchun pastdagi tugmani bosing:", {
     reply_markup: {
       inline_keyboard: [
@@ -130,16 +138,16 @@ bot.on('message', (msg) => {
   });
 });
 
-// Handle callback for inline buttons
+// Handle inline button presses
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
 
   if (data === "start_command") {
-    // Simulate /start command
+    // Simulate /start command to register user
     bot.emit('text', { chat: { id: chatId }, text: '/start', from: query.from });
     bot.answerCallbackQuery(query.id);
   } else {
-    bot.answerCallbackQuery(query.id); // just acknowledge other buttons if any
+    bot.answerCallbackQuery(query.id);
   }
 });
