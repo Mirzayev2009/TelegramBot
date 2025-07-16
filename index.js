@@ -108,3 +108,38 @@ bot.onText(/\/pick_winners/, async (msg) => {
 
   bot.sendMessage(msg.chat.id, `🏆 G‘oliblar:\n${winners.map(w => '👤 ' + w.telegram_id).join('\n')}`);
 });
+
+
+// Catch-all message handler for any text that is NOT /start
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (!text) return; // ignore non-text messages
+
+  // If user already sent /start, ignore here (or you can handle it separately)
+  if (text.startsWith('/start')) return;
+
+  // Reply with a message and inline "Start" button
+  bot.sendMessage(chatId, "Salom! Boshlash uchun pastdagi tugmani bosing:", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🚀 Boshlash", callback_data: "start_command" }]
+      ]
+    }
+  });
+});
+
+// Handle callback for inline buttons
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data;
+
+  if (data === "start_command") {
+    // Simulate /start command
+    bot.emit('text', { chat: { id: chatId }, text: '/start', from: query.from });
+    bot.answerCallbackQuery(query.id);
+  } else {
+    bot.answerCallbackQuery(query.id); // just acknowledge other buttons if any
+  }
+});
