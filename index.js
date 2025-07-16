@@ -7,32 +7,30 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const ADMIN_ID = 5032534773;
 
-// === 🚀 Setup ===
+
+
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// === /start command ===
+// /start — Save telegram_id if not already saved
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
   try {
-    console.log('🔍 Checking Telegram ID:', telegram_id);
-
     const { data: existing, error: checkError } = await supabase
-      .from('telegram_users')
+      .from('bot_user_data')
       .select('id')
       .eq('telegram_id', telegram_id)
       .maybeSingle();
 
     if (checkError) {
-      console.error('❌ Supabase SELECT error:', checkError);
-      throw checkError;
+      console.error('❌ SELECT ERROR:', checkError);
+      return bot.sendMessage(chatId, `❌ Tekshirishda xatolik:\n${checkError.message}`);
     }
 
     if (existing) {
-      console.log('✅ Already registered:', telegram_id);
-      return bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
+      return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
     }
 
     const { error: insertError } = await supabase
@@ -40,56 +38,55 @@ bot.onText(/\/start/, async (msg) => {
       .insert({ telegram_id });
 
     if (insertError) {
-  console.error('❌ Supabase INSERT error:', insertError);
-  return bot.sendMessage(chatId, `❌ Supabase error: ${insertError.message}`);
-}
+      console.error('❌ INSERT ERROR:', insertError);
+      return bot.sendMessage(chatId, `❌ Yozishda xatolik:\n${insertError.message}`);
+    }
 
-
-    console.log('✅ Telegram ID inserted:', telegram_id);
-    return bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
+    return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
 
   } catch (err) {
-    console.error('❌ Final error handler:', err);
-    return bot.sendMessage(chatId, "❌ Tekshirishda xatolik.");
+    console.error('❌ GENERAL ERROR:', err);
+    return bot.sendMessage(chatId, "❌ Noma'lum xatolik.");
   }
 });
 
-// === /broadcast command ===
+// Admin: /broadcast
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const text = match[1];
+
   const { data: users, error } = await supabase.from('telegram_users').select('telegram_id');
 
   if (error) {
-    console.error('❌ Broadcast select error:', error);
-    return bot.sendMessage(msg.chat.id, "❌ Foydalanuvchilarni olishda xatolik.");
+    console.error('❌ Supabase SELECT error (broadcast):', error);
+    return bot.sendMessage(msg.chat.id, `❌ Xatolik:\n${error.message}`);
   }
 
   for (const user of users) {
     try {
       await bot.sendMessage(user.telegram_id, text);
     } catch (e) {
-      console.warn('❌ Yuborilmadi:', user.telegram_id);
+      console.warn('⚠️ Yuborib bo‘lmadi:', user.telegram_id);
     }
   }
 
   bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// === /pick_winners command ===
+// Admin: /pick_winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const { data: users, error } = await supabase.from('telegram_users').select('*');
+
   if (error) {
-    console.error('❌ Winner select error:', error);
-    return bot.sendMessage(msg.chat.id, "❌ Foydalanuvchilarni olishda xatolik.");
+    console.error('❌ Supabase SELECT error (winners):', error);
+    return bot.sendMessage(msg.chat.id, `❌ Xatolik:\n${error.message}`);
   }
 
-  if (!users || users.length < 3) {
+  if (!users || users.length < 3)
     return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
-  }
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
 
