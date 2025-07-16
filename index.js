@@ -40,6 +40,8 @@ bot.on('callback_query', async (query) => {
   const state = tempUsers[chatId];
   if (!state) return;
 
+  await bot.answerCallbackQuery(query.id); // ✅ CRITICAL
+
   const data = query.data;
 
   if (data.startsWith('use_name_')) {
@@ -51,6 +53,7 @@ bot.on('callback_query', async (query) => {
     bot.sendMessage(chatId, '✍️ Iltimos, ismingizni yozing:');
   }
 });
+
 
 // Message handler
 bot.on('message', async (msg) => {
