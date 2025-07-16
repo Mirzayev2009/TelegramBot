@@ -9,6 +9,11 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const ADMIN_ID = 5032534773;
 
 
+const bot = new TelegramBot(token, { polling: true });
+const supabase = createClient(supabaseUrl, supabaseKey);
+const tempUsers = {}; // to track unregistered users during flow
+
+
 
 // /start
 bot.onText(/\/start/, async (msg) => {
