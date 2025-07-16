@@ -6,43 +6,35 @@ const supabaseUrl = 'https://scinkyuoosbtpdowdzhd.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjaW5reXVvb3NidHBkb3dkemhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyNTQ4NTQsImV4cCI6MjA2NzgzMDg1NH0.eiku1mD-_bZXUoIJHmhJ6IfemmBPxcnjms1buENCcyw';
 
 const ADMIN_ID = 5032534773;
-
-
-
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
-const tempUsers = {}; // holds incomplete registrations
+const tempUsers = {};
 
-// START COMMAND
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
-  // Check if already registered
-  const { data: exists } = await supabase
+  const { data } = await supabase
     .from('users')
     .select('id')
     .eq('telegram_id', telegram_id)
     .maybeSingle();
 
-  if (exists) {
-    return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
-  }
+  if (data) return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
 
   const fullName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ');
   tempUsers[chatId] = { telegram_id };
 
-  bot.sendMessage(chatId, "👤 Ismingizni tanlang:", {
+  bot.sendMessage(chatId, '👤 Ismingizni kiriting:', {
     reply_markup: {
       inline_keyboard: [
         [{ text: fullName, callback_data: `name_${encodeURIComponent(fullName)}` }],
-        [{ text: "✍️ Yozib kiritaman", callback_data: "name_manual" }]
-      ]
-    }
+        [{ text: '✍️ Yozib kiritaman', callback_data: 'name_manual' }],
+      ],
+    },
   });
 });
 
-// HANDLE NAME SELECTION
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
@@ -50,126 +42,138 @@ bot.on('callback_query', (query) => {
 
   const data = query.data;
 
-  if (data.startsWith("name_")) {
-    state.name = decodeURIComponent(data.replace("name_", ""));
-    return askPhone(chatId);
+  if (data.startsWith('name_')) {
+    state.name = decodeURIComponent(data.replace('name_', ''));
+    askPhone(chatId);
   }
 
-  if (data === "name_manual") {
-    bot.sendMessage(chatId, "✍️ Iltimos, ismingizni yozing:");
+  if (data === 'name_manual') {
+    bot.sendMessage(chatId, '✍️ Iltimos, ismingizni yozing:');
   }
 });
 
-// MESSAGE HANDLER
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
   if (!state) return;
 
-  // NAME TYPING
   if (!state.name && msg.text && !msg.contact) {
     state.name = msg.text;
     return askPhone(chatId);
   }
 
-  // PHONE FROM CONTACT
   if (!state.phone && msg.contact) {
     state.phone = msg.contact.phone_number;
-    return checkAndSave(chatId);
+    return validateAndSave(chatId);
   }
 
-  // PHONE MANUAL TYPING
   if (state.name && !state.phone && msg.text) {
     state.phone = msg.text;
-    return checkAndSave(chatId);
+    return validateAndSave(chatId);
   }
 });
 
 function askPhone(chatId) {
-  bot.sendMessage(chatId, `📞 Telefon raqamingizni yuboring.\n\n📱 Tugmani bosing (agar Telegram profilingizda raqam ulangan bo‘lsa)\n\nAgar ishlamasa, ✍️ quyidagi shaklda yozing:\n\n+998901234567 yoki 901234567`, {
-    reply_markup: {
-      keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
-      resize_keyboard: true,
-      one_time_keyboard: true
+  bot.sendMessage(
+    chatId,
+    '📞 Telefon raqamingizni kiriting:\n\n📱 Tugmani bosib yuboring (agar telefon ulangan bo‘lsa), yoki\n✍️ Quyidagi formatda yozing: +998901234567 yoki 901234567',
+    {
+      reply_markup: {
+        keyboard: [[{ text: '📱 Raqamni yuborish', request_contact: true }]],
+        resize_keyboard: true,
+        one_time_keyboard: true,
+      },
     }
-  });
+  );
 }
 
-async function checkAndSave(chatId) {
+async function validateAndSave(chatId) {
   const state = tempUsers[chatId];
-  if (!state.name || !state.phone) return;
+  let phone = state.phone.replace(/\s/g, '');
 
-  const phone = state.phone.replace(/\s/g, '');
-  const validPhone = /^(\+?998)?\d{9}$/.test(phone);
-  if (!validPhone) {
-    return bot.sendMessage(chatId, "❗ Telefon raqam noto‘g‘ri. Iltimos, quyidagicha yozing:\n\n+998901234567 yoki 901234567");
+  if (/^9\d{8}$/.test(phone)) {
+    phone = '+998' + phone;
+  } else if (/^998\d{9}$/.test(phone)) {
+    phone = '+' + phone;
+  } else if (!/^\+998\d{9}$/.test(phone)) {
+    return bot.sendMessage(
+      chatId,
+      '❗ Telefon raqam noto‘g‘ri.\nTo‘g‘ri format: +998901234567 yoki 901234567'
+    );
   }
 
-  await bot.sendMessage(chatId, "⏳ Ma'lumotlaringiz saqlanmoqda...");
+  state.phone = phone;
 
-  const { data: exists } = await supabase
+  const { data } = await supabase
     .from('users')
     .select('id')
     .eq('telegram_id', state.telegram_id)
     .maybeSingle();
 
-  if (exists) {
-    await bot.sendMessage(chatId, "⚠️ Siz allaqachon ro‘yxatdan o‘tgansiz.");
+  if (data) {
+    await bot.sendMessage(chatId, '⚠️ Siz allaqachon ro‘yxatdan o‘tgansiz.');
   } else {
     const { error } = await supabase.from('users').insert({
       id: state.telegram_id,
       telegram_id: state.telegram_id,
       name: state.name,
-      phone: phone,
-      created_at: new Date().toISOString()
+      phone: state.phone,
+      created_at: new Date().toISOString(),
     });
 
     if (error) {
-      console.error(error);
-      return bot.sendMessage(chatId, "❌ Xatolik yuz berdi. Qayta urinib ko‘ring.");
+      console.error('Supabase insert error:', error);
+      return bot.sendMessage(chatId, '❌ Xatolik yuz berdi.');
     }
 
-    await bot.sendMessage(chatId, "✅ Ro‘yxatdan o‘tdingiz!");
+    await bot.sendMessage(chatId, '✅ Ro‘yxatdan o‘tdingiz!');
   }
 
   delete tempUsers[chatId];
 }
 
-// BROADCAST
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
   const text = match[1];
 
   const { data: users } = await supabase.from('users').select('telegram_id');
+
   for (const user of users) {
     try {
       await bot.sendMessage(user.telegram_id, text);
     } catch (e) {
-      console.warn("❌ Failed to message:", user.telegram_id);
+      console.warn(`❌ Failed to message ${user.telegram_id}:`, e.message);
     }
   }
 
-  bot.sendMessage(msg.chat.id, "📤 Xabar yuborildi.");
+  bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// PICK WINNERS
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
+
   const { data: users } = await supabase.from('users').select('*');
 
   if (!users || users.length < 3) {
-    return bot.sendMessage(msg.chat.id, "❗ Kamida 3 foydalanuvchi kerak.");
+    return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
   }
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
+
   for (const user of winners) {
     await supabase.from('winners').insert({
       user_id: user.telegram_id,
-      selected_at: new Date().toISOString()
+      selected_at: new Date().toISOString(),
     });
 
-    await bot.sendMessage(user.telegram_id, `🎉 Tabriklaymiz ${user.name}! Siz g‘olib bo‘ldingiz!`);
+    await bot.sendMessage(
+      user.telegram_id,
+      `🎉 Tabriklaymiz ${user.name}! Siz g‘olib bo‘ldingiz!`
+    );
   }
 
-  bot.sendMessage(msg.chat.id, `🏆 G‘oliblar:\n${winners.map(w => '👤 ' + w.name).join('\n')}`);
+  bot.sendMessage(
+    msg.chat.id,
+    `🏆 G‘oliblar:\n${winners.map((w) => '👤 ' + w.name).join('\n')}`
+  );
 });
