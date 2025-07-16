@@ -11,7 +11,7 @@ const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 const tempUsers = {};
 
-// Start command
+// /start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
@@ -37,7 +37,7 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// Callback handler for name choice
+// Handle name via callback
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
@@ -55,34 +55,35 @@ bot.on('callback_query', (query) => {
   }
 });
 
-// Main message handler
+// Handle messages (name / phone)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
   if (!state) return;
 
-  // If name not set, treat as manual name
+  // Manual name input
   if (!state.name && msg.text && !msg.contact) {
     state.name = msg.text;
     return askPhone(chatId);
   }
 
-  // If phone sent as contact
+  // Phone sent via contact
   if (msg.contact && !state.phone) {
     state.phone = msg.contact.phone_number;
     return checkAndSave(chatId);
   }
 
-  // If phone typed manually
+  // Phone typed manually
   if (state.name && !state.phone && msg.text && !msg.contact) {
     state.phone = msg.text;
     return checkAndSave(chatId);
   }
 });
 
-// Ask for phone
+// Ask for phone number
 function askPhone(chatId) {
-  bot.sendMessage(chatId, "📞 Telefon raqamingizni yuboring.\n\n📱 Tugma orqali yuborishingiz yoki quyidagi formatda yozishingiz mumkin:\n\nMisol: +998901234567 yoki 901234567", {
+  bot.sendMessage(chatId, "📞 Telefon raqamingizni yuboring.\n\n📱 Tugmani bosing (agar Telegram profilingizda raqam ulangan bo‘lsa)\n\nAgar ishlamasa, ✍️ quyidagi shaklda yozing:\n\n`+998901234567` yoki `901234567`", {
+    parse_mode: "Markdown",
     reply_markup: {
       keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
       resize_keyboard: true,
@@ -91,17 +92,22 @@ function askPhone(chatId) {
   });
 }
 
-// Validate and save
+// Save user only when name + phone are valid
 async function checkAndSave(chatId) {
   const state = tempUsers[chatId];
   if (!state.name || !state.phone) return;
 
-  // Clean and validate phone
   const phone = state.phone.replace(/\s/g, '');
   const isValid = /^(\+998)?\d{9}$/.test(phone);
+
   if (!isValid) {
-    return bot.sendMessage(chatId, "❗ Telefon raqam noto‘g‘ri. Iltimos, +998 bilan yoki 9 ta raqamdan iborat qilib yozing. Misol: +998901234567 yoki 901234567");
+    return bot.sendMessage(chatId, "❗ Telefon raqam noto‘g‘ri. Iltimos, quyidagicha yozing:\n\n`+998901234567` yoki `901234567`", {
+      parse_mode: "Markdown"
+    });
   }
+
+  // ⚡ Instant feedback while Supabase saves
+  await bot.sendMessage(chatId, "⏳ Ma'lumotlaringiz saqlanmoqda. Iltimos, kuting...");
 
   const { data: existing } = await supabase
     .from('users')
@@ -131,7 +137,7 @@ async function checkAndSave(chatId) {
   delete tempUsers[chatId];
 }
 
-// Admin: Broadcast
+// /broadcast command
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
   const text = match[1];
@@ -149,7 +155,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, "📤 Xabar yuborildi.");
 });
 
-// Admin: Pick Winners
+// /pick_winners command
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
