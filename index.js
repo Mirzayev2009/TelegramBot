@@ -7,19 +7,18 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 
 const ADMIN_ID = 5032534773;
 
-// Init
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 const tempUsers = {};
 
-// /start
+// Start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
   const { data } = await supabase
     .from('users')
-    .select('id')
+    .select('id', { head: true })
     .eq('telegram_id', telegram_id)
     .maybeSingle();
 
@@ -38,7 +37,7 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// Handle name selection or manual input
+// Callback handler for name choice
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
@@ -56,34 +55,34 @@ bot.on('callback_query', (query) => {
   }
 });
 
-// Handle name or phone input
+// Main message handler
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
   if (!state) return;
 
-  // If name not yet given and user types text
+  // If name not set, treat as manual name
   if (!state.name && msg.text && !msg.contact) {
     state.name = msg.text;
     return askPhone(chatId);
   }
 
-  // If phone is sent via contact
+  // If phone sent as contact
   if (msg.contact && !state.phone) {
     state.phone = msg.contact.phone_number;
     return checkAndSave(chatId);
   }
 
-  // If phone is typed manually
+  // If phone typed manually
   if (state.name && !state.phone && msg.text && !msg.contact) {
     state.phone = msg.text;
     return checkAndSave(chatId);
   }
 });
 
-// Ask phone number
+// Ask for phone
 function askPhone(chatId) {
-  bot.sendMessage(chatId, "📞 Telefon raqamingizni yuboring:", {
+  bot.sendMessage(chatId, "📞 Telefon raqamingizni yuboring.\n\n📱 Tugma orqali yuborishingiz yoki quyidagi formatda yozishingiz mumkin:\n\nMisol: +998901234567 yoki 901234567", {
     reply_markup: {
       keyboard: [[{ text: "📱 Raqamni yuborish", request_contact: true }]],
       resize_keyboard: true,
@@ -92,14 +91,21 @@ function askPhone(chatId) {
   });
 }
 
-// Save user to Supabase only if both fields are ready
+// Validate and save
 async function checkAndSave(chatId) {
   const state = tempUsers[chatId];
   if (!state.name || !state.phone) return;
 
+  // Clean and validate phone
+  const phone = state.phone.replace(/\s/g, '');
+  const isValid = /^(\+998)?\d{9}$/.test(phone);
+  if (!isValid) {
+    return bot.sendMessage(chatId, "❗ Telefon raqam noto‘g‘ri. Iltimos, +998 bilan yoki 9 ta raqamdan iborat qilib yozing. Misol: +998901234567 yoki 901234567");
+  }
+
   const { data: existing } = await supabase
     .from('users')
-    .select('id')
+    .select('id', { head: true })
     .eq('telegram_id', state.telegram_id)
     .maybeSingle();
 
@@ -110,12 +116,12 @@ async function checkAndSave(chatId) {
       id: state.telegram_id,
       telegram_id: state.telegram_id,
       name: state.name,
-      phone: state.phone,
+      phone: phone,
       created_at: new Date().toISOString()
     });
 
     if (error) {
-      console.error("❌ Supabase error:", error);
+      console.error("❌ Supabase insert error:", error);
       return bot.sendMessage(chatId, "❌ Xatolik yuz berdi.");
     }
 
@@ -125,11 +131,11 @@ async function checkAndSave(chatId) {
   delete tempUsers[chatId];
 }
 
-// Broadcast to all users (admin only)
+// Admin: Broadcast
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
-
   const text = match[1];
+
   const { data: users } = await supabase.from('users').select('telegram_id');
 
   for (const user of users) {
@@ -143,7 +149,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, "📤 Xabar yuborildi.");
 });
 
-// Pick winners (admin only)
+// Admin: Pick Winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
