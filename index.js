@@ -8,95 +8,55 @@ const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS
 const ADMIN_ID = 5032534773;
 
 
-// === INIT ===
+// Initialize bot and Supabase client
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- Helper: check if user exists ---
-async function isUserRegistered(telegram_id) {
-  const { data, error } = await supabase
-    .from('bot_user_data')
-    .select('id')
-    .eq('telegram_id', telegram_id)
-    .maybeSingle();
-
-  if (error) {
-    console.error('❌ Supabase SELECT error:', error);
-    return false; // Assume not registered on error to be safe
-  }
-  return !!data;
-}
-
-// --- /start handler ---
+// Handle /start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
   try {
-    if (await isUserRegistered(telegram_id)) {
-      return bot.sendMessage(chatId, "✅ Siz allaqachon ro'yxatdan o'tgansiz.");
+    // Check if user exists
+    const { data: existing, error: checkError } = await supabase
+      .from('bot_user_data')
+      .select('id')
+      .eq('telegram_id', telegram_id)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('❌ SELECT ERROR:', checkError);
+      return bot.sendMessage(chatId, `❌ Tekshirishda xatolik:\n${checkError.message}`);
     }
 
+    if (existing) {
+      // User already registered
+      return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
+    }
+
+    // Insert new user
     const { error: insertError } = await supabase
       .from('bot_user_data')
       .insert({ telegram_id });
 
     if (insertError) {
-      console.error('❌ Supabase INSERT error:', insertError);
-      return bot.sendMessage(chatId, `❌ Ro'yxatdan o'tishda xatolik:\n${insertError.message}`);
+      // If unique constraint violation (someone else inserted meanwhile)
+      if (insertError.code === '23505') {
+        return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
+      }
+      console.error('❌ INSERT ERROR:', insertError);
+      return bot.sendMessage(chatId, `❌ Yozishda xatolik:\n${insertError.message}`);
     }
 
-    return bot.sendMessage(chatId, "✅ Ro'yxatdan muvaffaqiyatli o'tdingiz!");
+    return bot.sendMessage(chatId, "✅ Ro'yxatdan o'tdingiz");
   } catch (err) {
     console.error('❌ GENERAL ERROR:', err);
-    return bot.sendMessage(chatId, "❌ Noma'lum xatolik yuz berdi.");
+    return bot.sendMessage(chatId, "❌ Noma'lum xatolik.");
   }
 });
 
-// --- Inline button handler ---
-bot.on('callback_query', (query) => {
-  const chatId = query.message.chat.id;
-  const data = query.data;
-
-  if (data === "start_command") {
-    // Simulate /start command triggered by button
-    bot.emit('text', {
-      chat: { id: chatId },
-      text: '/start',
-      from: query.from
-    });
-    bot.answerCallbackQuery(query.id);
-  } else {
-    bot.answerCallbackQuery(query.id);
-  }
-});
-
-// --- Catch-all message handler for unregistered users ---
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  const telegram_id = String(msg.from.id);
-  const text = msg.text;
-
-  if (!text) return; // ignore non-text messages
-  if (text.startsWith('/start')) return; // /start already handled
-
-  try {
-    if (!(await isUserRegistered(telegram_id))) {
-      // Send inline "Start" button prompt
-      await bot.sendMessage(chatId, "Salom! Boshlash uchun pastdagi tugmani bosing:", {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🚀 Boshlash", callback_data: "start_command" }]
-          ]
-        }
-      });
-    }
-  } catch (err) {
-    console.error('❌ GENERAL ERROR in message handler:', err);
-  }
-});
-
-// --- /broadcast command for admin ---
+// Handle admin /broadcast command
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -116,17 +76,18 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
       try {
         await bot.sendMessage(user.telegram_id, text);
       } catch (e) {
-        console.warn(`⚠️ Xabar yuborib bo'lmadi: ${user.telegram_id}`);
+        console.warn('⚠️ Yuborib bo‘lmadi:', user.telegram_id);
       }
     }
 
-    bot.sendMessage(msg.chat.id, '📤 Xabar muvaffaqiyatli yuborildi.');
+    bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
   } catch (err) {
     console.error('❌ GENERAL ERROR (broadcast):', err);
+    bot.sendMessage(msg.chat.id, '❌ Xatolik yuz berdi.');
   }
 });
 
-// --- /pick_winners command for admin ---
+// Handle admin /pick_winners command
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -141,7 +102,7 @@ bot.onText(/\/pick_winners/, async (msg) => {
     }
 
     if (!users || users.length < 3) {
-      return bot.sendMessage(msg.chat.id, '❗ Kamida 3 ta foydalanuvchi bo‘lishi kerak.');
+      return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
     }
 
     const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
@@ -158,5 +119,42 @@ bot.onText(/\/pick_winners/, async (msg) => {
     bot.sendMessage(msg.chat.id, `🏆 G‘oliblar:\n${winners.map(w => '👤 ' + w.telegram_id).join('\n')}`);
   } catch (err) {
     console.error('❌ GENERAL ERROR (pick_winners):', err);
+    bot.sendMessage(msg.chat.id, '❌ Xatolik yuz berdi.');
   }
 });
+
+// Catch-all for any non-/start text messages
+bot.on('message', (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+
+  if (!text) return;
+
+  // Ignore /start here because it’s handled above
+  if (text.startsWith('/start')) return;
+
+  // Show inline button to trigger /start command for ease of use
+  bot.sendMessage(chatId, "Salom! Boshlash uchun pastdagi tugmani bosing:", {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "🚀 Boshlash", callback_data: "start_command" }]
+      ]
+    }
+  });
+});
+
+// Handle inline button callbacks
+bot.on('callback_query', (query) => {
+  const chatId = query.message.chat.id;
+  const data = query.data;
+
+  if (data === "start_command") {
+    // Trigger /start command manually
+    bot.emit('text', { chat: { id: chatId }, text: '/start', from: query.from });
+    bot.answerCallbackQuery(query.id);
+  } else {
+    bot.answerCallbackQuery(query.id); // just acknowledge unknown buttons
+  }
+});
+
+console.log('🤖 Bot is running...');
