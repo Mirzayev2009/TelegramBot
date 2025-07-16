@@ -12,7 +12,7 @@ const ADMIN_ID = 5032534773;
 
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
-const tempUsers = {}; // Track unregistered users
+const tempUsers = {}; // Track user input states
 
 // /start command
 bot.onText(/\/start/, async (msg) => {
@@ -25,57 +25,56 @@ bot.onText(/\/start/, async (msg) => {
     .eq('telegram_id', telegram_id)
     .maybeSingle();
 
-  if (data) {
-    return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
-  }
+  if (data) return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
 
   const fullName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ');
-  tempUsers[chatId] = { telegram_id, waiting: false };
+  tempUsers[chatId] = { telegram_id, waiting: 'name' };
 
   bot.sendMessage(chatId, '👤 Ismingizni tanlang:', {
     reply_markup: {
       inline_keyboard: [
         [{ text: fullName, callback_data: `name_${encodeURIComponent(fullName)}` }],
-        [{ text: '✍️ Yozib kiritaman', callback_data: 'name_manual' }]
+        [{ text: '✍️ Ismimni yozaman', callback_data: 'name_manual' }]
       ]
     }
   });
 });
 
-// Handle name selection or manual entry
-bot.on('callback_query', (query) => {
+bot.on('callback_query', async (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
-  if (!state || state.name) return;
+  if (!state) return;
 
   const data = query.data;
   if (data.startsWith('name_')) {
     state.name = decodeURIComponent(data.replace('name_', ''));
+    state.waiting = 'phone';
     askPhone(chatId);
   } else if (data === 'name_manual') {
+    state.waiting = 'manual_name';
     bot.sendMessage(chatId, '✍️ Iltimos, ismingizni yozing:');
   }
 });
 
-// Handle name or phone input
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
-  if (!state || state.waiting) return;
+  if (!state) return;
 
-  if (!state.name && msg.text && !msg.contact) {
+  if (state.waiting === 'manual_name' && msg.text) {
     state.name = msg.text;
+    state.waiting = 'phone';
     return askPhone(chatId);
   }
 
-  if (!state.phone && msg.contact) {
-    state.phone = msg.contact.phone_number;
-    return validateAndSave(chatId);
-  }
-
-  if (!state.phone && msg.text && state.name) {
-    state.phone = msg.text;
-    return validateAndSave(chatId);
+  if (state.waiting === 'phone') {
+    if (msg.contact) {
+      state.phone = msg.contact.phone_number;
+      return validateAndSave(chatId);
+    } else if (msg.text) {
+      state.phone = msg.text;
+      return validateAndSave(chatId);
+    }
   }
 });
 
@@ -91,7 +90,7 @@ function askPhone(chatId) {
 
 async function validateAndSave(chatId) {
   const state = tempUsers[chatId];
-  let phone = state.phone.replace(/\s/g, '');
+  let phone = (state.phone || '').replace(/\s|\-/g, '');
 
   if (/^9\d{8}$/.test(phone)) {
     phone = '+998' + phone;
@@ -100,10 +99,6 @@ async function validateAndSave(chatId) {
   } else if (!/^\+998\d{9}$/.test(phone)) {
     return bot.sendMessage(chatId, '❗ Telefon raqam noto‘g‘ri.\nTo‘g‘ri format: +998901234567 yoki 901234567');
   }
-
-  state.phone = phone;
-  state.waiting = true;
-  bot.sendChatAction(chatId, 'typing');
 
   const { data: existing } = await supabase
     .from('users')
@@ -120,7 +115,7 @@ async function validateAndSave(chatId) {
     id: state.telegram_id,
     telegram_id: state.telegram_id,
     name: state.name,
-    phone: state.phone,
+    phone,
     created_at: new Date().toISOString()
   });
 
