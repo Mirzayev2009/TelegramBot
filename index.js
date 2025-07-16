@@ -12,7 +12,7 @@ const ADMIN_ID = 5032534773;
 
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
-const tempUsers = {};
+const tempUsers = {}; // Track unregistered users
 
 // /start command
 bot.onText(/\/start/, async (msg) => {
@@ -42,7 +42,7 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// Handle inline name or manual input
+// Handle name selection or manual entry
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
@@ -57,32 +57,28 @@ bot.on('callback_query', (query) => {
   }
 });
 
-// Handle manual messages (name/phone)
+// Handle name or phone input
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
   if (!state || state.waiting) return;
 
-  // Manual name
   if (!state.name && msg.text && !msg.contact) {
     state.name = msg.text;
     return askPhone(chatId);
   }
 
-  // Contact phone
   if (!state.phone && msg.contact) {
     state.phone = msg.contact.phone_number;
     return validateAndSave(chatId);
   }
 
-  // Manual phone
   if (!state.phone && msg.text && state.name) {
     state.phone = msg.text;
     return validateAndSave(chatId);
   }
 });
 
-// Ask for phone
 function askPhone(chatId) {
   bot.sendMessage(chatId, '📞 Telefon raqamingizni yuboring.\n\n📱 Tugmani bosing (agar Telegram profilingizda raqam ulangan bo‘lsa), yoki\n✍️ Quyidagi formatda yozing: +998901234567 yoki 901234567', {
     reply_markup: {
@@ -93,7 +89,6 @@ function askPhone(chatId) {
   });
 }
 
-// Validate phone and save user
 async function validateAndSave(chatId) {
   const state = tempUsers[chatId];
   let phone = state.phone.replace(/\s/g, '');
@@ -131,38 +126,37 @@ async function validateAndSave(chatId) {
 
   if (error) {
     console.error('❌ Supabase error:', error);
-    return bot.sendMessage(chatId, '❌ Xatolik yuz berdi.');
+    bot.sendMessage(chatId, '❌ Xatolik yuz berdi.');
+  } else {
+    bot.sendMessage(chatId, '✅ Ro‘yxatdan o‘tdingiz!');
   }
 
-  bot.sendMessage(chatId, '✅ Ro‘yxatdan o‘tdingiz!');
   delete tempUsers[chatId];
 }
 
-// Admin command: /broadcast <message>
+// Admin: /broadcast
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
   const text = match[1];
-  const { data: users } = await supabase.from('users').select('telegram_id');
 
+  const { data: users } = await supabase.from('users').select('telegram_id');
   for (const user of users) {
     try {
       await bot.sendMessage(user.telegram_id, text);
     } catch (e) {
-      console.warn(`❌ Could not send to ${user.telegram_id}:`, e.message);
+      console.warn('❌ Failed to message', user.telegram_id);
     }
   }
 
   bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// Admin command: /pick_winners
+// Admin: /pick_winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const { data: users } = await supabase.from('users').select('*');
-  if (!users || users.length < 3) {
-    return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
-  }
+  if (!users || users.length < 3) return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
   for (const user of winners) {
