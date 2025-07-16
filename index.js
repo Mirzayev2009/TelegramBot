@@ -9,8 +9,6 @@ const ADMIN_ID = 5032534773;
 
 
 
-
-
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -19,40 +17,56 @@ bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
-  const { data: existing } = await supabase
-    .from('telegram_users')
-    .select('id')
-    .eq('telegram_id', telegram_id)
-    .maybeSingle();
+  try {
+    const { data: existing, error: checkError } = await supabase
+      .from('telegram_users')
+      .select('id')
+      .eq('telegram_id', telegram_id)
+      .maybeSingle();
 
-  if (existing) {
-    return bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
+    if (checkError) {
+      console.error('❌ SELECT ERROR:', checkError.message);
+      return bot.sendMessage(chatId, "❌ Tekshirishda xatolik.");
+    }
+
+    if (existing) {
+      return bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
+    }
+
+    const { error: insertError } = await supabase.from('telegram_users').insert({
+      telegram_id
+    });
+
+    if (insertError) {
+      console.error('❌ INSERT ERROR:', insertError.message);
+      return bot.sendMessage(chatId, "❌ Xatolik yuz berdi. Qaytadan urinib ko‘ring.");
+    }
+
+    bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
+
+  } catch (err) {
+    console.error('❌ UNEXPECTED ERROR:', err);
+    bot.sendMessage(chatId, "❌ Botda kutilmagan xatolik.");
   }
-
-  const { error } = await supabase.from('telegram_users').insert({
-    telegram_id
-  });
-
-  if (error) {
-    console.error('❌ Supabase error:', error);
-    return bot.sendMessage(chatId, "❌ Xatolik yuz berdi. Qaytadan urinib ko‘ring.");
-  }
-
-  bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
 });
 
 // Admin: /broadcast
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
-  const text = match[1];
 
-  const { data: users } = await supabase.from('telegram_users').select('telegram_id');
+  const text = match[1];
+  const { data: users, error } = await supabase.from('telegram_users').select('telegram_id');
+
+  if (error) {
+    console.error('❌ BROADCAST SELECT ERROR:', error.message);
+    return bot.sendMessage(msg.chat.id, '❌ Foydalanuvchilarni olishda xatolik.');
+  }
 
   for (const user of users) {
     try {
       await bot.sendMessage(user.telegram_id, text);
     } catch (e) {
-      console.warn('❌ Yuborilmadi:', user.telegram_id);
+      console.warn('❌ Yuborib bo‘lmadi:', user.telegram_id);
     }
   }
 
@@ -63,9 +77,16 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
-  const { data: users } = await supabase.from('telegram_users').select('*');
-  if (!users || users.length < 3)
+  const { data: users, error } = await supabase.from('telegram_users').select('*');
+
+  if (error) {
+    console.error('❌ PICK WINNERS SELECT ERROR:', error.message);
+    return bot.sendMessage(msg.chat.id, '❌ Foydalanuvchilarni olishda xatolik.');
+  }
+
+  if (!users || users.length < 3) {
     return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
+  }
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
 
