@@ -5,15 +5,11 @@ const token = '7228927101:AAFn6d5Z371GXPT8F5nf4aUGSd0O_F7_tAQ';
 const supabaseUrl = 'https://scinkyuoosbtpdowdzhd.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjaW5reXVvb3NidHBkb3dkemhkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTIyNTQ4NTQsImV4cCI6MjA2NzgzMDg1NH0.eiku1mD-_bZXUoIJHmhJ6IfemmBPxcnjms1buENCcyw';
 
-
 const ADMIN_ID = 5032534773;
-
 
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
-const tempUsers = {}; // to track unregistered users during flow
-
-
+const tempUsers = {}; // To track users during registration
 
 // /start
 bot.onText(/\/start/, async (msg) => {
@@ -41,7 +37,7 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// Name handler
+// Name selection handler
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const state = tempUsers[chatId];
@@ -56,6 +52,7 @@ bot.on('callback_query', (query) => {
 
   if (data === "name_manual") {
     bot.sendMessage(chatId, "✍️ Iltimos, ismingizni yozing:");
+    // Do NOT ask for phone yet — wait for user input
   }
 });
 
@@ -77,14 +74,14 @@ bot.on('message', async (msg) => {
     return saveUser(chatId);
   }
 
-  // Phone from manual input
+  // Phone from manual text input
   if (state.name && !state.phone && msg.text) {
     state.phone = msg.text;
     return saveUser(chatId);
   }
 });
 
-// Ask phone
+// Ask phone number
 function askPhone(chatId) {
   bot.sendMessage(chatId, "📞 Telefon raqamingizni yuboring:", {
     reply_markup: {
@@ -95,12 +92,11 @@ function askPhone(chatId) {
   });
 }
 
-// Save to Supabase
+// Save user to Supabase
 async function saveUser(chatId) {
   const state = tempUsers[chatId];
-  console.log("Saving user:", state); // Debug log
+  console.log("Saving user:", state);
 
-  // Prevent duplicate
   const { data } = await supabase
     .from('users')
     .select('id')
@@ -129,7 +125,7 @@ async function saveUser(chatId) {
   delete tempUsers[chatId];
 }
 
-// /broadcast
+// /broadcast message
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
   const text = match[1];
@@ -147,7 +143,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   bot.sendMessage(msg.chat.id, "📤 Xabar yuborildi.");
 });
 
-// /pick_winners
+// /pick_winners command
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
