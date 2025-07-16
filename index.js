@@ -12,15 +12,22 @@ const ADMIN_ID = 5032534773;
 
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
-const tempUsers = {}; // Track per-user state
+const tempUsers = {};
 
-// Start command
+// /start command
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
 
-  const { data } = await supabase.from('users').select('id').eq('telegram_id', telegram_id).maybeSingle();
-  if (data) return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
+  const { data } = await supabase
+    .from('users')
+    .select('id')
+    .eq('telegram_id', telegram_id)
+    .maybeSingle();
+
+  if (data) {
+    return bot.sendMessage(chatId, '✅ Siz allaqachon ro‘yxatdan o‘tgansiz.');
+  }
 
   const fullName = [msg.from.first_name, msg.from.last_name].filter(Boolean).join(' ');
   tempUsers[chatId] = { telegram_id, waiting: false };
@@ -35,13 +42,13 @@ bot.onText(/\/start/, async (msg) => {
   });
 });
 
-// Callback for name selection
-bot.on('callback_query', async (query) => {
+// Handle inline name or manual input
+bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
-  const data = query.data;
   const state = tempUsers[chatId];
   if (!state || state.name) return;
 
+  const data = query.data;
   if (data.startsWith('name_')) {
     state.name = decodeURIComponent(data.replace('name_', ''));
     askPhone(chatId);
@@ -50,28 +57,32 @@ bot.on('callback_query', async (query) => {
   }
 });
 
-// Handle messages (name or phone input)
+// Handle manual messages (name/phone)
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   const state = tempUsers[chatId];
   if (!state || state.waiting) return;
 
+  // Manual name
   if (!state.name && msg.text && !msg.contact) {
     state.name = msg.text;
     return askPhone(chatId);
   }
 
+  // Contact phone
   if (!state.phone && msg.contact) {
     state.phone = msg.contact.phone_number;
     return validateAndSave(chatId);
   }
 
+  // Manual phone
   if (!state.phone && msg.text && state.name) {
     state.phone = msg.text;
     return validateAndSave(chatId);
   }
 });
 
+// Ask for phone
 function askPhone(chatId) {
   bot.sendMessage(chatId, '📞 Telefon raqamingizni yuboring.\n\n📱 Tugmani bosing (agar Telegram profilingizda raqam ulangan bo‘lsa), yoki\n✍️ Quyidagi formatda yozing: +998901234567 yoki 901234567', {
     reply_markup: {
@@ -82,6 +93,7 @@ function askPhone(chatId) {
   });
 }
 
+// Validate phone and save user
 async function validateAndSave(chatId) {
   const state = tempUsers[chatId];
   let phone = state.phone.replace(/\s/g, '');
@@ -98,7 +110,12 @@ async function validateAndSave(chatId) {
   state.waiting = true;
   bot.sendChatAction(chatId, 'typing');
 
-  const { data: existing } = await supabase.from('users').select('id').eq('telegram_id', state.telegram_id).maybeSingle();
+  const { data: existing } = await supabase
+    .from('users')
+    .select('id')
+    .eq('telegram_id', state.telegram_id)
+    .maybeSingle();
+
   if (existing) {
     delete tempUsers[chatId];
     return bot.sendMessage(chatId, '⚠️ Siz allaqachon ro‘yxatdan o‘tgansiz.');
@@ -114,15 +131,14 @@ async function validateAndSave(chatId) {
 
   if (error) {
     console.error('❌ Supabase error:', error);
-    bot.sendMessage(chatId, '❌ Xatolik yuz berdi.');
-  } else {
-    bot.sendMessage(chatId, '✅ Ro‘yxatdan o‘tdingiz!');
+    return bot.sendMessage(chatId, '❌ Xatolik yuz berdi.');
   }
 
+  bot.sendMessage(chatId, '✅ Ro‘yxatdan o‘tdingiz!');
   delete tempUsers[chatId];
 }
 
-// Admin: /broadcast
+// Admin command: /broadcast <message>
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
   const text = match[1];
@@ -132,22 +148,23 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     try {
       await bot.sendMessage(user.telegram_id, text);
     } catch (e) {
-      console.warn('❌ Failed to message', user.telegram_id);
+      console.warn(`❌ Could not send to ${user.telegram_id}:`, e.message);
     }
   }
 
   bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
 });
 
-// Admin: /pick_winners
+// Admin command: /pick_winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const { data: users } = await supabase.from('users').select('*');
-  if (!users || users.length < 3) return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
+  if (!users || users.length < 3) {
+    return bot.sendMessage(msg.chat.id, '❗ Kamida 3 foydalanuvchi kerak.');
+  }
 
   const winners = users.sort(() => 0.5 - Math.random()).slice(0, 3);
-
   for (const user of winners) {
     await supabase.from('winners').insert({
       user_id: user.telegram_id,
