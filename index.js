@@ -40,9 +40,10 @@ bot.onText(/\/start/, async (msg) => {
       .insert({ telegram_id });
 
     if (insertError) {
-      console.error('❌ Supabase INSERT error:', insertError);
-      throw insertError;
-    }
+  console.error('❌ Supabase INSERT error:', insertError);
+  return bot.sendMessage(chatId, `❌ Supabase error: ${insertError.message}`);
+}
+
 
     console.log('✅ Telegram ID inserted:', telegram_id);
     return bot.sendMessage(chatId, "Ro'yxatdan o'tdingiz");
