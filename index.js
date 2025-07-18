@@ -147,3 +147,13 @@ bot.on('callback_query', (query) => {
 });
 
 console.log('🤖 Bot is running...');
+let successCount = 0;
+for (const user of users) {
+  try {
+    await bot.sendMessage(user.telegram_id, text);
+    successCount++;
+  } catch (e) {
+    console.warn('⚠️ Failed:', user.telegram_id);
+  }
+}
+bot.sendMessage(msg.chat.id, `📤 Xabar yuborildi. ${successCount} ta foydalanuvchiga muvaffaqiyatli yuborildi.`);
