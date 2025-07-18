@@ -1,5 +1,6 @@
-const TelegramBot = require('node-telegram-bot-api');
-const { createClient } = require('@supabase/supabase-js');
+import TelegramBot from 'node-telegram-bot-api';
+import { createClient } from '@supabase/supabase-js';
+
 
 const token = '7661394640:AAHns_1buMgks9n_40xWtgzx2Lei5CXXMi8';
 const supabaseUrl = 'https://scinkyuoosbtpdowdzhd.supabase.co';
