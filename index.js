@@ -158,3 +158,19 @@ bot.on('callback_query', (query) => {
 });
 
 console.log('🤖 Bot is running...');
+
+let successCount = 0;
+let failedCount = 0;
+
+for (const user of users) {
+  try {
+    await bot.sendMessage(user.telegram_id, text);
+    console.log(`✅ Sent to: ${user.telegram_id}`);
+    successCount++;
+  } catch (e) {
+    console.warn(`❌ Failed for: ${user.telegram_id} — ${e.message}`);
+    failedCount++;
+  }
+}
+
+bot.sendMessage(msg.chat.id, `📤 Yuborildi.\n✅ ${successCount} ta yuborildi\n❌ ${failedCount} ta yuborilmadi`);
