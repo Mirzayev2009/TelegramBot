@@ -12,7 +12,6 @@ const ADMIN_ID = 5032534773;
 const bot = new TelegramBot(token, { polling: true });
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// /start — register telegram_id
 bot.onText(/\/start/, async (msg) => {
   const chatId = msg.chat.id;
   const telegram_id = String(msg.from.id);
@@ -51,6 +50,7 @@ bot.onText(/\/start/, async (msg) => {
     return bot.sendMessage(chatId, "❌ Noma'lum xatolik.");
   }
 });
+
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -73,7 +73,8 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     }
 
     for (const user of users) {
-      const chatId = String(user.telegram_id); // ensure it's a string
+      const chatId = String(user.telegram_id);
+
       if (!chatId || chatId.length < 5) {
         console.warn('⛔ Noto‘g‘ri telegram_id:', chatId);
         failed++;
@@ -95,7 +96,6 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     bot.sendMessage(msg.chat.id, '❌ Xatolik yuz berdi.');
   }
 });
-
 
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
@@ -132,7 +132,6 @@ bot.onText(/\/pick_winners/, async (msg) => {
   }
 });
 
-// Fallback for normal user messages — show start inline button only for normal users
 bot.on('message', (msg) => {
   const chatId = msg.chat.id;
   const text = msg.text;
@@ -148,7 +147,6 @@ bot.on('message', (msg) => {
   });
 });
 
-// Inline button to simulate /start
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const data = query.data;
