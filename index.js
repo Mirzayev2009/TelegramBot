@@ -52,10 +52,12 @@ bot.onText(/\/start/, async (msg) => {
   }
 });
 
-// /broadcast — send message to all
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
+
   const text = match[1];
+  let success = 0;
+  let failed = 0;
 
   try {
     const { data: users, error } = await supabase
@@ -63,26 +65,31 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
       .select('telegram_id');
 
     if (error) {
-      console.error('❌ Supabase SELECT error (broadcast):', error);
+      console.error('❌ Supabase SELECT error:', error);
       return bot.sendMessage(msg.chat.id, `❌ Xatolik:\n${error.message}`);
     }
 
     for (const user of users) {
       try {
-        await bot.sendMessage(user.telegram_id, text);
-      } catch (e) {
-        console.warn('⚠️ Yuborib bo‘lmadi:', user.telegram_id);
+        if (user.telegram_id) {
+          await bot.sendMessage(user.telegram_id, text);
+          success++;
+        } else {
+          failed++;
+        }
+      } catch (err) {
+        console.warn(`❌ Yuborib bo‘lmadi (${user.telegram_id}):`, err.message);
+        failed++;
       }
     }
 
-    bot.sendMessage(msg.chat.id, '📤 Xabar yuborildi.');
+    bot.sendMessage(msg.chat.id, `📤 Tugadi:\n✅ Yuborilgan: ${success}\n❌ Xatolik: ${failed}`);
   } catch (err) {
     console.error('❌ GENERAL ERROR (broadcast):', err);
     bot.sendMessage(msg.chat.id, '❌ Xatolik yuz berdi.');
   }
 });
 
-// /pick_winners — select and notify 3 random winners
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -147,13 +154,3 @@ bot.on('callback_query', (query) => {
 });
 
 console.log('🤖 Bot is running...');
-let successCount = 0;
-for (const user of users) {
-  try {
-    await bot.sendMessage(user.telegram_id, text);
-    successCount++;
-  } catch (e) {
-    console.warn('⚠️ Failed:', user.telegram_id);
-  }
-}
-bot.sendMessage(msg.chat.id, `📤 Xabar yuborildi. ${successCount} ta foydalanuvchiga muvaffaqiyatli yuborildi.`);
