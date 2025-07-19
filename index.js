@@ -51,7 +51,6 @@ bot.onText(/\/start/, async (msg) => {
     return bot.sendMessage(chatId, "❌ Noma'lum xatolik.");
   }
 });
-
 bot.onText(/\/broadcast (.+)/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
@@ -69,16 +68,23 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
       return bot.sendMessage(msg.chat.id, `❌ Xatolik:\n${error.message}`);
     }
 
+    if (!users || users.length === 0) {
+      return bot.sendMessage(msg.chat.id, '⚠️ Hech qanday foydalanuvchi topilmadi.');
+    }
+
     for (const user of users) {
+      const chatId = String(user.telegram_id); // ensure it's a string
+      if (!chatId || chatId.length < 5) {
+        console.warn('⛔ Noto‘g‘ri telegram_id:', chatId);
+        failed++;
+        continue;
+      }
+
       try {
-        if (user.telegram_id) {
-          await bot.sendMessage(user.telegram_id, text);
-          success++;
-        } else {
-          failed++;
-        }
+        await bot.sendMessage(chatId, text);
+        success++;
       } catch (err) {
-        console.warn(`❌ Yuborib bo‘lmadi (${user.telegram_id}):`, err.message);
+        console.warn(`❌ Yuborilmadi (${chatId}):`, err.message);
         failed++;
       }
     }
@@ -89,6 +95,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
     bot.sendMessage(msg.chat.id, '❌ Xatolik yuz berdi.');
   }
 });
+
 
 bot.onText(/\/pick_winners/, async (msg) => {
   if (msg.from.id !== ADMIN_ID) return;
