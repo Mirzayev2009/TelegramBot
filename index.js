@@ -50,11 +50,14 @@ bot.onText(/\/start/, async (msg) => {
     return bot.sendMessage(chatId, "❌ Noma'lum xatolik.");
   }
 });
-
-bot.onText(/\/broadcast (.+)/, async (msg, match) => {
+bot.onText(/\/broadcast(?:\s+([\s\S]+))?/, async (msg, match) => {
   if (msg.from.id !== ADMIN_ID) return;
 
   const text = match[1];
+  if (!text || text.trim() === '') {
+    return bot.sendMessage(msg.chat.id, '✍️ Xabar matnini yuboring: `/broadcast Xabar matni`', { parse_mode: 'Markdown' });
+  }
+
   let success = 0;
   let failed = 0;
 
@@ -82,7 +85,7 @@ bot.onText(/\/broadcast (.+)/, async (msg, match) => {
       }
 
       try {
-        await bot.sendMessage(chatId, text);
+        await bot.sendMessage(chatId, text, { parse_mode: 'HTML' }); // or 'Markdown'
         success++;
       } catch (err) {
         console.warn(`❌ Yuborilmadi (${chatId}):`, err.message);
